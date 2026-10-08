@@ -8,7 +8,7 @@ from backend.config import Settings
 from backend.document_store import LocalDocumentStore
 from backend.pdf_processor import PDFProcessor
 from backend.qa_engine import NOT_FOUND, QueryEngine
-from backend.retriever import LocalFAISSRetriever, tokens
+from backend.retriever import LocalNumpyRetriever, tokens
 from backend.schemas import QueryRequest
 from tests.test_pdf_processor import write_sample_pdf
 
@@ -29,8 +29,7 @@ def make_engine(tmp_path: Path) -> QueryEngine:
     settings = Settings(tmp_path, tmp_path / "uploads", tmp_path / "indexes", tmp_path / "model")
     settings.ensure_directories()
     store = LocalDocumentStore(settings.uploads_dir, settings.indexes_dir)
-    # Exercise the persisted local-index fallback; production prefers FAISS automatically.
-    retriever = LocalFAISSRetriever(store, DeterministicEmbedder(), use_faiss=False)
+    retriever = LocalNumpyRetriever(store, DeterministicEmbedder())
     return QueryEngine(PDFProcessor(chunk_words=80, overlap_words=10), retriever, store)
 
 

@@ -1,8 +1,8 @@
 # Financial Risk AI
 
-Local-only financial document intelligence for confidential PDFs. It extracts text with PyMuPDF, detects sector/section boundaries, embeds chunks using a locally stored DistilBERT model, and stores the vectors in a per-document FAISS index. On a Windows host where the native FAISS DLL cannot load, it automatically uses a persisted NumPy cosine-similarity index instead; the API and document format remain unchanged. `/query` uses `sector + request` to retrieve evidence and produces an extractive answer from the PDF text only.
+Local-only financial document intelligence for confidential PDFs. It extracts text with PyMuPDF, detects sector/section boundaries, embeds chunks using a locally stored DistilBERT model, and stores normalized vectors in a per-document NumPy (`vectors.npy`) index. Retrieval is exact cosine similarity via NumPy matrix multiplication; for the hackathon's small, per-document indexes this is transparent, CPU-friendly, and avoids native FAISS dependencies. `/query` uses `sector + request` to retrieve evidence and produces an extractive answer from the PDF text only.
 
-This is intentionally not a generative chatbot: no PDF contents, queries, chunks, or embeddings are sent to an external service. DistilBERT is compact enough to run inference on a normal CPU-only laptop; startup loads it once and later requests reuse the saved document index. The `DocumentStore` and `Retriever` interfaces isolate local storage/FAISS so Azure Blob Storage or Azure Search can be added without changing the FastAPI layer.
+This is intentionally not a generative chatbot: no PDF contents, queries, chunks, or embeddings are sent to an external service. DistilBERT is compact enough to run inference on a normal CPU-only laptop; startup loads it once and later requests reuse the saved document index. The `DocumentStore` and `Retriever` interfaces isolate local storage/retrieval so Azure Blob Storage or another private retriever can be added without changing the FastAPI layer.
 
 ## Run on Windows
 

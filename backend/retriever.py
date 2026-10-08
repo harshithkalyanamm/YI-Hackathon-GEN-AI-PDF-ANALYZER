@@ -1,4 +1,4 @@
-"""FAISS-backed local retrieval abstraction."""
+"""Persisted NumPy cosine-similarity retrieval for small local document sets."""
 from __future__ import annotations
 
 import json
@@ -31,21 +31,17 @@ class Retriever(ABC):
     def search(self, document_id: str, sector: str, request: str, top_k: int) -> list[Chunk]: ...
 
 
-class LocalFAISSRetriever(Retriever):
-    def __init__(self, store, embedder, use_faiss: bool = True) -> None:
-        self.store, self.embedder = store, embedder
-        self.use_faiss = use_faiss
-        self._cache: dict[str, tuple[object, list[Chunk]]] = {}
+class LocalNumpyRetriever(Retriever):
+    """Exact, transparent local vector search.
 
-    def _faiss(self):
-        """Load FAISS only when it is needed, allowing a safe Windows fallback."""
-        if not self.use_faiss:
-            return None
-        try:
-            import faiss
-            return faiss
-        except (ImportError, OSError):
-            return None
+    Document and query vectors are L2-normalized by the embedder, making a matrix
+    multiplication equivalent to cosine-similarity search. For the hackathon's
+    per-document indexes (hundreds or low thousands of chunks), this is simple,
+    deterministic, and more than fast enough on a CPU without native DLLs.
+    """
+    def __init__(self, store, embedder) -> None:
+        self.store, self.embedder = store, embedder
+        self._cache: dict[str, tuple[np.ndarray, list[Chunk]]] = {}
 
     def build(self, document_id: str, chunks: list[Chunk]) -> None:
         if not chunks:
@@ -53,34 +49,18 @@ class LocalFAISSRetriever(Retriever):
         vectors = self.embedder.embed([self._index_text(chunk) for chunk in chunks])
         directory = self.store.index_dir(document_id)
         directory.mkdir(parents=True, exist_ok=True)
-        faiss = self._faiss()
-        if faiss:
-            index = faiss.IndexFlatIP(vectors.shape[1])
-            index.add(vectors)
-            faiss.write_index(index, str(directory / "index.faiss"))
-        else:
-            index = vectors
-        # Keep a tiny portable representation as well. It lets a document indexed
-        # on a FAISS-capable machine remain queryable on a Windows host without a
-        # compatible native FAISS DLL.
         np.save(directory / "vectors.npy", vectors)
         (directory / "chunks.json").write_text(json.dumps([chunk.to_dict() for chunk in chunks]), encoding="utf-8")
-        self._cache[document_id] = (index, chunks)
+        self._cache[document_id] = (vectors, chunks)
 
     def _load(self, document_id: str):
         if document_id in self._cache:
             return self._cache[document_id]
         directory = self.store.index_dir(document_id)
-        index_file, vector_file, chunks_file = directory / "index.faiss", directory / "vectors.npy", directory / "chunks.json"
-        if (not index_file.is_file() and not vector_file.is_file()) or not chunks_file.is_file():
+        vector_file, chunks_file = directory / "vectors.npy", directory / "chunks.json"
+        if not vector_file.is_file() or not chunks_file.is_file():
             raise FileNotFoundError(document_id)
-        faiss = self._faiss()
-        if index_file.is_file() and faiss:
-            index = faiss.read_index(str(index_file))
-        elif vector_file.is_file():
-            index = np.load(vector_file)
-        else:
-            raise FileNotFoundError(document_id)
+        index = np.load(vector_file)
         chunks = [Chunk(**item) for item in json.loads(chunks_file.read_text(encoding="utf-8"))]
         self._cache[document_id] = (index, chunks)
         return index, chunks
@@ -94,12 +74,7 @@ class LocalFAISSRetriever(Retriever):
         query = f"{sector} {request}"
         vector = self.embedder.embed([query])
         limit = min(len(chunks), max(top_k * 4, 12))
-        faiss = self._faiss()
-        if faiss and not isinstance(index, np.ndarray):
-            _, ids = index.search(vector, limit)
-            candidate_ids = ids[0]
-        else:
-            candidate_ids = np.argsort(-(index @ vector[0]))[:limit]
+        candidate_ids = np.argsort(-(index @ vector[0]))[:limit]
         wanted_sector = sector.casefold().strip()
         request_terms = tokens(request)
         # For named risk types, require their distinguishing words. This prevents a

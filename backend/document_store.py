@@ -42,5 +42,4 @@ class LocalDocumentStore(DocumentStore):
 
     def exists(self, document_id: str) -> bool:
         directory = self.index_dir(document_id)
-        has_index = (directory / "index.faiss").is_file() or (directory / "vectors.npy").is_file()
-        return self.upload_path(document_id).is_file() and has_index
+        return self.upload_path(document_id).is_file() and (directory / "vectors.npy").is_file()

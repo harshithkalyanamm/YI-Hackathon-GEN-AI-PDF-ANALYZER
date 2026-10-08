@@ -13,7 +13,7 @@ from .document_store import LocalDocumentStore
 from .model_manager import LocalDistilBERTEmbedder
 from .pdf_processor import PDFProcessor
 from .qa_engine import QueryEngine
-from .retriever import LocalFAISSRetriever
+from .retriever import LocalNumpyRetriever
 from .schemas import QueryRequest, QueryResponse, UploadResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -24,7 +24,7 @@ def build_engine(settings: Settings) -> QueryEngine:
     settings.ensure_directories()
     store = LocalDocumentStore(settings.uploads_dir, settings.indexes_dir)
     embedder = LocalDistilBERTEmbedder(settings.model_dir)
-    return QueryEngine(PDFProcessor(settings.chunk_words, settings.chunk_overlap_words), LocalFAISSRetriever(store, embedder), store, settings.top_k)
+    return QueryEngine(PDFProcessor(settings.chunk_words, settings.chunk_overlap_words), LocalNumpyRetriever(store, embedder), store, settings.top_k)
 
 
 def create_app(settings: Settings | None = None, engine: QueryEngine | None = None) -> FastAPI:
