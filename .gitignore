@@ -12,4 +12,6 @@ demo-preview.pdf
 *.dll
 *venv
 /site-packages
+/Lib
+*/Lib
 
