@@ -8,3 +8,4 @@ __pycache__/
 .pytest_cache/
 demo_energy_study.pdf
 demo-preview.pdf
+.venv
