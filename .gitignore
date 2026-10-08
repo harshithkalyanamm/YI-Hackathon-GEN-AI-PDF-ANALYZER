@@ -9,3 +9,7 @@ __pycache__/
 demo_energy_study.pdf
 demo-preview.pdf
 .venv
+*.dll
+*venv
+/site-packages
+
