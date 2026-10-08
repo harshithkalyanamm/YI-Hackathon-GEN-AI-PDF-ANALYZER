@@ -1,0 +1,10 @@
+data/uploads/
+data/indexes/
+models/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+demo_energy_study.pdf
+demo-preview.pdf
