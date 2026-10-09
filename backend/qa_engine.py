@@ -1,9 +1,8 @@
 """Evidence-only extractive answer assembly; no generative model or external calls."""
 from __future__ import annotations
 
-import re
-
-from .retriever import tokens
+import json
+from .evidence import EvidenceExtractor, EvidenceFinding
 
 NOT_FOUND = "The requested information could not be found in the uploaded document."
 
@@ -11,33 +10,37 @@ NOT_FOUND = "The requested information could not be found in the uploaded docume
 class QueryEngine:
     def __init__(self, processor, retriever, store, top_k: int = 4) -> None:
         self.processor, self.retriever, self.store, self.top_k = processor, retriever, store, top_k
+        self.evidence_extractor = EvidenceExtractor()
 
     def index_document(self, document_id: str) -> None:
-        text = self.processor.extract_text(self.store.upload_path(document_id))
-        self.retriever.build(document_id, self.processor.chunk_document(text))
+        document = self.processor.parse_document(
+            self.store.upload_path(document_id), document_id, self.store.original_filename(document_id)
+        )
+        chunks = self.processor.chunk_structured_document(document)
+        if not chunks:
+            raise ValueError("The PDF did not contain searchable content.")
+        directory = self.store.index_dir(document_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "structured_document.json").write_text(
+            json.dumps(document.to_dict(), ensure_ascii=False), encoding="utf-8"
+        )
+        self.retriever.build(document_id, chunks)
 
-    def answer(self, document_id: str, sector: str, request: str) -> str:
+    def retrieve_evidence(self, document_id: str, sector: str, request: str) -> list[EvidenceFinding]:
         try:
             chunks = self.retriever.search(document_id, sector, request, self.top_k)
         except FileNotFoundError:
-            return NOT_FOUND
+            return []
         if not chunks:
+            return []
+        raw_findings = self.evidence_extractor.extract(chunks, request)
+        return self.evidence_extractor.validate(raw_findings, document_id, sector)
+
+    def answer(self, document_id: str, sector: str, request: str) -> str:
+        findings = self.retrieve_evidence(document_id, sector, request)
+        if not findings:
             return NOT_FOUND
-        request_terms = tokens(request)
-        selected: list[str] = []
-        seen: set[str] = set()
-        for chunk in chunks:
-            sentences = re.split(r"(?<=[.!?])\s+", chunk.text)
-            ranked = sorted(
-                sentences,
-                key=lambda sentence: len(tokens(sentence) & request_terms),
-                reverse=True,
-            )
-            for sentence in ranked:
-                cleaned = re.sub(r"\s+", " ", sentence).strip()
-                if len(cleaned) >= 20 and cleaned not in seen:
-                    selected.append(cleaned)
-                    seen.add(cleaned)
-                    if len(selected) == 3:
-                        return " ".join(selected)
-        return " ".join(selected) if selected else NOT_FOUND
+        # Two evidence sentences normally answer a focused factual question while
+        # avoiding a broad chapter-summary response. The detailed assessment
+        # endpoints remain available for multi-finding outputs.
+        return " ".join(finding.statement for finding in findings[:2])

@@ -1,4 +1,5 @@
 import io
+import json
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from backend.pdf_processor import PDFProcessor
 from backend.qa_engine import NOT_FOUND, QueryEngine
 from backend.retriever import LocalNumpyRetriever, tokens
 from backend.schemas import QueryRequest
+from backend.schemas import DocumentType
 from tests.test_pdf_processor import write_sample_pdf
 
 
@@ -62,6 +64,9 @@ def test_indexing_and_sector_request_retrieval(tmp_path: Path) -> None:
     write_sample_pdf(source)
     document_id = engine.store.save_upload(source, "study.pdf")
     engine.index_document(document_id)
+    structured = engine.store.index_dir(document_id) / "structured_document.json"
+    assert structured.is_file()
+    assert "elements" in json.loads(structured.read_text(encoding="utf-8"))
 
     answer = engine.answer(document_id, "Energy", "climate transition risk")
 
@@ -77,7 +82,9 @@ def test_api_upload_query_and_missing_information(tmp_path: Path) -> None:
 
     upload_handler = next(route.endpoint for route in app.routes if getattr(route, "path", None) == "/upload")
     query_handler = next(route.endpoint for route in app.routes if getattr(route, "path", None) == "/query")
-    uploaded = run_immediate(upload_handler(InMemoryPDFUpload("study.pdf", source.read_bytes()), engine))
+    uploaded = run_immediate(upload_handler(
+        InMemoryPDFUpload("study.pdf", source.read_bytes()), engine, DocumentType.GENERAL, None
+    ))
     assert uploaded.status == "processed"
 
     response = run_immediate(query_handler(QueryRequest(

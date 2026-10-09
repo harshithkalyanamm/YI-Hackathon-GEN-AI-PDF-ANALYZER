@@ -16,6 +16,7 @@ class Settings:
     chunk_words: int = 180
     chunk_overlap_words: int = 35
     top_k: int = 4
+    retrieval_strategy: str = "dense"
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -26,6 +27,7 @@ class Settings:
             uploads_dir=data_dir / "uploads",
             indexes_dir=data_dir / "indexes",
             model_dir=Path(os.getenv("FINANCIAL_RISK_MODEL_DIR", root / "models" / "distilbert-base-uncased")),
+            retrieval_strategy=os.getenv("FINANCIAL_RISK_RETRIEVAL_STRATEGY", "dense").lower(),
         )
 
     def ensure_directories(self) -> None:

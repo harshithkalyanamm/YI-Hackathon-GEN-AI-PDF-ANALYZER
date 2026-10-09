@@ -1,0 +1,42 @@
+[
+  {
+    "case_id": "T001",
+    "sector": "Energy",
+    "request": "sector risk",
+    "expected_section": "Sector Risk",
+    "should_find_evidence": true,
+    "description": "Sector narrative should be retrieved without Technology leakage."
+  },
+  {
+    "case_id": "T002",
+    "sector": "Energy",
+    "request": "bank risk",
+    "expected_section": "Bank Risk",
+    "should_find_evidence": true,
+    "description": "Bank-risk heading and lending language should be retrieved."
+  },
+  {
+    "case_id": "T003",
+    "sector": "Energy",
+    "request": "climate transition risk",
+    "expected_section": "Climate Transition Risk",
+    "should_find_evidence": true,
+    "description": "Climate-transition evidence should be retrieved from Energy only."
+  },
+  {
+    "case_id": "T004",
+    "sector": "Technology",
+    "request": "climate transition risk",
+    "expected_section": "Climate Transition Risk",
+    "should_find_evidence": true,
+    "description": "Same risk name must remain isolated to Technology."
+  },
+  {
+    "case_id": "T005",
+    "sector": "Energy",
+    "request": "biodiversity offset requirement",
+    "expected_section": null,
+    "should_find_evidence": false,
+    "description": "Unsupported question must safely abstain."
+  }
+]
